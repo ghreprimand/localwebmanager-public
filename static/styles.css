@@ -1,0 +1,141 @@
+:root {
+  --bg: #f2efe6;
+  --ink: #14213d;
+  --muted: #516079;
+  --panel: #ffffff;
+  --accent: #ff7d00;
+  --accent-soft: #ffe9d1;
+  --border: #d5d8df;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 0%, #fff3df 0%, transparent 45%),
+    radial-gradient(circle at 90% 100%, #d9ebff 0%, transparent 40%),
+    var(--bg);
+}
+
+.shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.2vw, 2.5rem);
+}
+
+p {
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+button {
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: #fff;
+  padding: 0.55rem 1rem;
+  border-radius: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.95);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.9rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0.9rem;
+  padding: 1rem;
+  box-shadow: 0 8px 20px rgba(20, 33, 61, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.card h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+dl {
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  background: #f7f8fa;
+  border-radius: 0.5rem;
+  padding: 0.55rem;
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.open-link {
+  align-self: flex-start;
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  background: var(--accent-soft);
+}
+
+.open-link:hover {
+  background: #ffd7ac;
+}

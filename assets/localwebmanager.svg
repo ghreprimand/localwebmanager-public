@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="LocalWebManager icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#12355B"/>
+      <stop offset="100%" stop-color="#1F7A8C"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#F4D35E"/>
+      <stop offset="100%" stop-color="#EE964B"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#bg)"/>
+
+  <rect x="88" y="120" width="336" height="272" rx="36" fill="#0B1F33" stroke="#B8D8E8" stroke-width="12"/>
+  <circle cx="132" cy="166" r="10" fill="#EE964B"/>
+  <circle cx="164" cy="166" r="10" fill="#F4D35E"/>
+  <circle cx="196" cy="166" r="10" fill="#9AD1D4"/>
+
+  <rect x="120" y="210" width="272" height="20" rx="10" fill="#2F4B63"/>
+  <rect x="120" y="250" width="188" height="20" rx="10" fill="#2F4B63"/>
+
+  <path d="M132 324 C168 286, 208 352, 244 314 C278 276, 320 348, 352 308" fill="none" stroke="url(#pulse)" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="352" cy="308" r="14" fill="#F4D35E"/>
+</svg>

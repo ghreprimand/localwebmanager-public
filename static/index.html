@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LocalWebManager</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Local Web Manager</h1>
+          <p>Active local web services on this machine</p>
+        </div>
+        <div class="controls">
+          <label class="toggle">
+            <input id="webOnlyToggle" type="checkbox" checked />
+            Likely web apps only
+          </label>
+          <button id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section>
+        <p id="meta"></p>
+        <div id="services" class="cards"></div>
+      </section>
+    </main>
+
+    <template id="cardTemplate">
+      <article class="card">
+        <h2 class="service-url"></h2>
+        <dl>
+          <div>
+            <dt>App</dt>
+            <dd class="app-name"></dd>
+          </div>
+          <div>
+            <dt>Process</dt>
+            <dd class="process-name"></dd>
+          </div>
+          <div>
+            <dt>PID</dt>
+            <dd class="pid"></dd>
+          </div>
+          <div>
+            <dt>Port</dt>
+            <dd class="port"></dd>
+          </div>
+          <div>
+            <dt>Folder</dt>
+            <dd class="cwd"></dd>
+          </div>
+        </dl>
+        <pre class="cmdline"></pre>
+        <a class="open-link" target="_blank" rel="noreferrer noopener">Open Service</a>
+      </article>
+    </template>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
