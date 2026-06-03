@@ -4,60 +4,147 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LocalWebManager</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css?v=3" />
   </head>
   <body>
     <main class="shell">
+      <!-- Header -->
       <header class="topbar">
-        <div>
-          <h1>Local Web Manager</h1>
-          <p>Active local web services on this machine</p>
+        <div class="topbar-left">
+          <div class="logo">
+            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+              <rect width="28" height="28" rx="8" fill="var(--accent)" />
+              <path
+                d="M8 10h12M8 14h8M8 18h10"
+                stroke="#fff"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+          <div>
+            <h1>Local Web Manager</h1>
+            <p class="subtitle">Discover &amp; manage local dev services</p>
+          </div>
         </div>
-        <div class="controls">
-          <label class="toggle">
-            <input id="webOnlyToggle" type="checkbox" checked />
-            Likely web apps only
-          </label>
-          <button id="refreshBtn" type="button">Refresh</button>
+        <div class="topbar-right">
+          <div class="filter-pill">
+            <label class="toggle-switch">
+              <input id="webOnlyToggle" type="checkbox" checked />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Web apps only</span>
+          </div>
+          <button id="refreshBtn" class="btn btn-primary" type="button">
+            <svg class="btn-icon spin-target" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M14 8A6 6 0 1 1 8 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              <path d="M8 0l2.5 2L8 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Refresh
+          </button>
         </div>
       </header>
 
-      <section>
-        <p id="meta"></p>
-        <div id="services" class="cards"></div>
-      </section>
+      <!-- Status bar -->
+      <div class="status-bar">
+        <span id="meta" class="status-text">Scanning…</span>
+        <span id="lastUpdated" class="status-time"></span>
+      </div>
+
+      <!-- Pinned services -->
+      <div id="pinnedSection" class="pinned-section hidden">
+        <h2 class="section-heading">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 1.5l1.5 3.5H13L9.5 7.5l1 4L7 9l-3.5 2.5 1-4L1 5h4.5z" fill="currentColor"/>
+          </svg>
+          Pinned
+        </h2>
+        <section id="pinnedServices" class="card-grid"></section>
+      </div>
+
+      <!-- Active services -->
+      <section id="services" class="card-grid"></section>
+
+      <!-- Empty state -->
+      <div id="emptyState" class="empty-state hidden">
+        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+          <circle cx="32" cy="32" r="30" stroke="var(--border)" stroke-width="2" stroke-dasharray="6 4" />
+          <path d="M22 32h20M32 22v20" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" />
+        </svg>
+        <p>No local web services detected</p>
+        <span class="empty-hint">Start a dev server and it will appear here automatically</span>
+      </div>
     </main>
 
+    <!-- Card template -->
     <template id="cardTemplate">
       <article class="card">
-        <h2 class="service-url"></h2>
-        <dl>
-          <div>
-            <dt>App</dt>
-            <dd class="app-name"></dd>
+        <div class="card-header">
+          <div class="card-title-row">
+            <span class="framework-badge"></span>
+            <h2 class="friendly-name"></h2>
           </div>
-          <div>
-            <dt>Process</dt>
-            <dd class="process-name"></dd>
+          <span class="port-badge"></span>
+        </div>
+
+        <div class="card-meta">
+          <div class="meta-row">
+            <span class="meta-label">Project</span>
+            <span class="meta-value app-name"></span>
           </div>
-          <div>
-            <dt>PID</dt>
-            <dd class="pid"></dd>
+          <div class="meta-row">
+            <span class="meta-label">Process</span>
+            <span class="meta-value process-info"></span>
           </div>
-          <div>
-            <dt>Port</dt>
-            <dd class="port"></dd>
+          <div class="meta-row">
+            <span class="meta-label">Directory</span>
+            <span class="meta-value cwd truncatable" title=""></span>
           </div>
-          <div>
-            <dt>Folder</dt>
-            <dd class="cwd"></dd>
-          </div>
-        </dl>
-        <pre class="cmdline"></pre>
-        <a class="open-link" target="_blank" rel="noreferrer noopener">Open Service</a>
+        </div>
+
+        <details class="cmd-details">
+          <summary>Command line</summary>
+          <code class="cmdline"></code>
+        </details>
+
+        <div class="card-actions">
+          <a class="btn btn-open open-link" href="#" target="_blank" rel="noreferrer noopener">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5.5 2H3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V8.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path d="M8 2h4v4M7 7l5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Open
+          </a>
+          <button class="btn btn-copy copy-url" type="button" title="Copy URL">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" />
+              <path d="M10 4V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v5.5A1.5 1.5 0 0 0 3 10h1" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+            Copy
+          </button>
+          <button class="btn btn-pin pin-btn" type="button" title="Pin service">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1.5l1.5 3.5H13L9.5 7.5l1 4L7 9l-3.5 2.5 1-4L1 5h4.5z" stroke="currentColor" stroke-width="1.2" fill="none" class="pin-star"/>
+            </svg>
+            <span class="pin-label">Pin</span>
+          </button>
+          <button class="btn btn-kill kill-btn" type="button" title="Stop this process (SIGTERM)">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="5.5" stroke="currentColor" stroke-width="1.5" />
+              <path d="M5 5l4 4M9 5l-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+            Kill
+          </button>
+        </div>
       </article>
     </template>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=3"></script>
   </body>
 </html>

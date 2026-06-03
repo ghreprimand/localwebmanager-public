@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+# LocalWebManager launcher — start|stop|restart|status|logs
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LWM_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PORT="${LWM_PORT:-8000}"
+URL="http://localhost:${PORT}"
+
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/localwebmanager"
+PID_FILE="${CACHE_DIR}/server.pid"
+PORT_FILE="${CACHE_DIR}/server.port"
+LOG_FILE="${CACHE_DIR}/localwebmanager.log"
+START_LOCK_DIR="${CACHE_DIR}/start.lock.d"
+BROWSER_LAST_OPEN="${CACHE_DIR}/browser-last-open"
+TRACE_FILE="${CACHE_DIR}/launcher-trace.log"
+
+mkdir -p "$CACHE_DIR"
+
+trace() {
+  printf '%s [pid=%d ppid=%d] %s\n' "$(date -Iseconds)" "$$" "$PPID" "$*" >> "$TRACE_FILE"
+}
+
+notify() {
+  local title="$1"
+  local body="${2:-}"
+  local urgency="${3:-normal}"
+  echo "[lwm-launcher] $title${body:+: $body}" >&2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -a LocalWebManager -u "$urgency" "$title" "$body" 2>/dev/null || true
+  fi
+}
+
+port_in_use() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}$"
+  else
+    (exec 3<>/dev/tcp/127.0.0.1/"$port") 2>/dev/null && { exec 3<&-; return 0; } || return 1
+  fi
+}
+
+pid_on_port() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp 2>/dev/null | awk -v p=":$port" '$4 ~ p {print $0}' | grep -oP 'pid=\K[0-9]+' | head -1 || true
+  else
+    echo ""
+  fi
+}
+
+find_free_port() {
+  local start="$1"
+  local port="$start"
+  local limit=$((start + 50))
+  while [[ "$port" -lt "$limit" ]]; do
+    if ! port_in_use "$port"; then
+      echo "$port"
+      return 0
+    fi
+    port=$((port + 1))
+  done
+  return 1
+}
+
+pid_is_lwm() {
+  local pid="$1"
+  [[ -z "$pid" ]] && return 1
+  if [[ -r "/proc/$pid/cmdline" ]]; then
+    if tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q "localwebmanager"; then
+      return 0
+    fi
+  fi
+  local cwd
+  cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+  if [[ -n "$cwd" && "$cwd" == "$LWM_DIR"* ]]; then
+    return 0
+  fi
+  return 1
+}
+
+is_running() {
+  if [[ -f "$PID_FILE" ]]; then
+    local pid
+    pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  if port_in_use "$PORT"; then
+    local pid
+    pid=$(pid_on_port "$PORT")
+    if [[ -n "$pid" ]] && pid_is_lwm "$pid"; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+wait_ready() {
+  local tries="${1:-60}"
+  for _ in $(seq 1 "$tries"); do
+    if port_in_use "$PORT"; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  return 1
+}
+
+open_browser() {
+  local now last
+  now=$(date +%s)
+  last=$(cat "$BROWSER_LAST_OPEN" 2>/dev/null || echo 0)
+  if [[ $((now - last)) -lt 30 ]]; then
+    trace "open_browser SKIP (rate-limit)"
+    return
+  fi
+  echo "$now" > "$BROWSER_LAST_OPEN"
+
+  if command -v xdg-open >/dev/null 2>&1; then
+    trace "open_browser FIRE xdg-open"
+    xdg-open "$URL" >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+    return
+  fi
+  for b in zen-browser zen firefox chromium google-chrome brave; do
+    if command -v "$b" >/dev/null 2>&1; then
+      trace "open_browser FIRE $b"
+      "$b" "$URL" >/dev/null 2>&1 &
+      disown 2>/dev/null || true
+      return
+    fi
+  done
+  notify "LocalWebManager started" "Could not find a browser. Visit $URL" "critical"
+}
+
+start() {
+  # mkdir-based lock — atomic on POSIX
+  if ! mkdir "$START_LOCK_DIR" 2>/dev/null; then
+    local lock_age
+    lock_age=$(( $(date +%s) - $(stat -c %Y "$START_LOCK_DIR" 2>/dev/null || date +%s) ))
+    if [[ "$lock_age" -gt 60 ]]; then
+      trace "start REAP-STALE-LOCK (age=${lock_age}s)"
+      rmdir "$START_LOCK_DIR" 2>/dev/null || true
+      mkdir "$START_LOCK_DIR" 2>/dev/null || {
+        trace "start SKIP (could not claim reaped lock)"
+        return 0
+      }
+    else
+      trace "start SKIP (another start holds lock, age=${lock_age}s)"
+      notify "LocalWebManager start already in progress"
+      return 0
+    fi
+  fi
+  # shellcheck disable=SC2064
+  trap "rmdir '$START_LOCK_DIR' 2>/dev/null || true" RETURN
+
+  # Always nuke any existing instance before fresh boot.
+  if is_running \
+       || port_in_use "$PORT" \
+       || pkill -0 -f "uvicorn localwebmanager" 2>/dev/null; then
+    trace "start NUKE-EXISTING → stop before fresh boot"
+    stop
+    sleep 1
+  fi
+
+  # Clean up stale PID file
+  rm -f "$PID_FILE" "$PORT_FILE"
+
+  # If a non-LWM process holds the port, bump to next free one
+  if port_in_use "$PORT"; then
+    local pid
+    pid=$(pid_on_port "$PORT")
+    if [[ -n "$pid" ]] && ! pid_is_lwm "$pid"; then
+      local fresh
+      fresh=$(find_free_port "$PORT") || {
+        notify "LocalWebManager: no free port" "All ports near $PORT are taken" "critical"
+        exit 1
+      }
+      if [[ "$fresh" != "$PORT" ]]; then
+        notify "LocalWebManager: port $PORT busy" "Using $fresh instead"
+        trace "start PORT-BUMP $PORT → $fresh (held by pid $pid)"
+        PORT="$fresh"
+        URL="http://localhost:${PORT}"
+      fi
+    else
+      # LWM process still on port after stop — force kill
+      [[ -n "$pid" ]] && kill -9 "$pid" 2>/dev/null || true
+      sleep 0.5
+    fi
+  fi
+
+  notify "Starting LocalWebManager" "Launching server on port $PORT"
+  cd "$LWM_DIR"
+  {
+    echo ""
+    echo "=== $(date -Iseconds) — localwebmanager start (port=$PORT) ==="
+  } >> "$LOG_FILE"
+
+  # Activate venv
+  if [[ -d .venv ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+  fi
+
+  # setsid keeps the server alive after the launcher exits
+  nohup setsid uvicorn localwebmanager.app:app --host 127.0.0.1 --port "$PORT" >> "$LOG_FILE" 2>&1 &
+  echo $! > "$PID_FILE"
+  echo "$PORT" > "$PORT_FILE"
+
+  if ! wait_ready 30; then
+    notify "LocalWebManager: start failed" "Did not bind port $PORT within 15s. See $LOG_FILE" "critical"
+    exit 1
+  fi
+
+  trace "start FRESH-BOOT → open_browser url=$URL"
+  notify "LocalWebManager ready" "$URL"
+  open_browser
+}
+
+stop() {
+  local pid=""
+  if [[ -f "$PID_FILE" ]]; then
+    pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
+  fi
+  if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+    kill -- -"$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+  fi
+  # Also kill any uvicorn running localwebmanager
+  pkill -f "uvicorn localwebmanager" 2>/dev/null || true
+  rm -f "$PID_FILE" "$PORT_FILE"
+  notify "LocalWebManager stopped"
+}
+
+status() {
+  if is_running; then
+    local running_port="$PORT"
+    [[ -f "$PORT_FILE" ]] && running_port=$(cat "$PORT_FILE" 2>/dev/null || echo "$PORT")
+    echo "LocalWebManager: RUNNING"
+    echo "  URL:    http://localhost:${running_port}"
+    echo "  log:    $LOG_FILE"
+    if [[ -f "$PID_FILE" ]]; then
+      echo "  PID:    $(cat "$PID_FILE")"
+    fi
+  else
+    echo "LocalWebManager: STOPPED"
+  fi
+}
+
+logs() {
+  if [[ ! -f "$LOG_FILE" ]]; then
+    echo "No log at $LOG_FILE yet"
+    exit 0
+  fi
+  tail -n "${2:-100}" -f "$LOG_FILE"
+}
+
+case "${1:-start}" in
+  start)   start ;;
+  stop)    stop ;;
+  restart) stop; sleep 1; start ;;
+  status)  status ;;
+  logs)    logs "$@" ;;
+  *)       echo "Usage: localwebmanager {start|stop|restart|status|logs}"; exit 1 ;;
+esac

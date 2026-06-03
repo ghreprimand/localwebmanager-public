@@ -4,20 +4,34 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-# GTK comes from system python packages; ensure psutil exists for that interpreter.
-if ! python3 -c "import gi; gi.require_version('Gtk', '4.0')" >/dev/null 2>&1; then
-  cat >&2 <<'EOF'
-GTK 4 Python bindings are required.
+PORT=8000
+URL="http://localhost:${PORT}"
 
-Install them with your system package manager, for example:
-  Arch:   sudo pacman -S python-gobject gtk4
-  Debian: sudo apt install python3-gi gir1.2-gtk-4.0
-EOF
-  exit 1
+# Activate the project venv
+if [[ -d .venv ]]; then
+  source .venv/bin/activate
 fi
 
-if ! python3 -c "import psutil" >/dev/null 2>&1; then
-  python3 -m pip install --user psutil >/dev/null
+# If already running on this port, just open the browser
+if curl -s -o /dev/null -w '' --max-time 1 "${URL}/api/services" 2>/dev/null; then
+  xdg-open "$URL" 2>/dev/null &
+  exit 0
 fi
 
-exec python3 -m localwebmanager.desktop
+# Start the server in the background
+uvicorn localwebmanager.app:app --host 127.0.0.1 --port "$PORT" &
+SERVER_PID=$!
+
+# Wait for the server to be ready (up to 5s)
+for i in $(seq 1 50); do
+  if curl -s -o /dev/null -w '' --max-time 1 "${URL}/api/services" 2>/dev/null; then
+    break
+  fi
+  sleep 0.1
+done
+
+# Open in default browser
+xdg-open "$URL" 2>/dev/null &
+
+# Keep running so the .desktop launcher doesn't kill the server
+wait "$SERVER_PID"

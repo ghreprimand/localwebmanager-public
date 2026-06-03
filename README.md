@@ -1,95 +1,82 @@
 # LocalWebManager
 
-LocalWebManager is a small native desktop utility for finding, opening, launching, and stopping local web development servers.
+LocalWebManager is a lightweight browser-based dashboard for discovering, inspecting, and stopping local web development servers.
 
-It is meant for developers who regularly have several localhost services running at once and want a fast desktop view of what is listening on which port.
+It scans your machine's listening TCP sockets, identifies dev servers by process name and command line, and presents them in a polished dark UI — with one-click open, URL copy, process kill, and pinning.
 
 ## Features
 
-- Native GTK 4 desktop app.
-- Active tab for detected localhost services.
-- Registered tab for saved project folders and launch commands.
-- One-click open, register, launch, edit, remove, and SIGTERM actions.
-- Auto-detect launch commands from `package.json` and lockfiles.
-- Works with common npm, pnpm, yarn, and bun project layouts.
-- Localhost web dashboard for quick browser-based inspection.
-- Auto-refresh every 5 seconds plus manual refresh.
+- Auto-detect running dev servers: Vite, Next.js, Nuxt, Astro, SvelteKit, Flask, Django, FastAPI, Rails, Bun, Deno, and more.
+- Friendly display names derived from project folder + detected framework (e.g. "My App · Vite").
+- Pin services to a persistent top section (stored in `localStorage`); pinned-but-offline services remain visible as greyed cards.
+- Kill any process with SIGTERM directly from the UI.
+- Copy URL to clipboard with visual feedback.
+- Live refresh with keyed DOM reconciliation — cards update in-place without flashing.
+- "Web apps only" filter toggle.
+- Responsive dark theme with Inter font.
 
-## Install Requirements
+## Requirements
 
-LocalWebManager needs Python 3, GTK 4 Python bindings, and `psutil`.
-
-Arch:
+Python 3.9+ and the packages in `requirements.txt` (fastapi, uvicorn, psutil, starlette).
 
 ```bash
-sudo pacman -S python python-gobject gtk4
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Debian/Ubuntu:
+## Running
 
-```bash
-sudo apt install python3 python3-gi gir1.2-gtk-4.0
-```
-
-`run-desktop.sh` will install `psutil` for the current user if it is missing.
-
-## Run The Desktop App
+### Quick start
 
 ```bash
 ./run-desktop.sh
 ```
 
-## Run The Browser Dashboard
+Starts the uvicorn server on port 8000 and opens the dashboard in your default browser. If the server is already running it just opens the browser.
+
+### Launcher script (start / stop / status / logs)
 
 ```bash
-./run.sh
+./scripts/localwebmanager start
+./scripts/localwebmanager stop
+./scripts/localwebmanager restart
+./scripts/localwebmanager status
+./scripts/localwebmanager logs
 ```
 
-Then open:
+The launcher manages a PID file under `~/.cache/localwebmanager/`, handles port conflicts, and sends desktop notifications via `notify-send` when available.
 
-```text
-http://127.0.0.1:8000/
+The port defaults to 8000. Override with the `LWM_PORT` environment variable.
+
+### Direct uvicorn
+
+```bash
+uvicorn localwebmanager.app:app --host 127.0.0.1 --port 8000
 ```
 
-The browser dashboard is intentionally read-only. Use the desktop app for register, launch, and kill actions.
+Then open `http://127.0.0.1:8000/`.
 
-## Install A Desktop Launcher
+## Install a Desktop Launcher
 
 ```bash
 ./scripts/install-desktop-entry.sh
 ```
 
-This installs a `.desktop` entry and icon under your user data directory.
+Installs a `.desktop` entry and icon under your user data directory so LocalWebManager appears in your application launcher.
 
 ## How Detection Works
 
-LocalWebManager scans local listening TCP sockets with `psutil`, keeps non-privileged localhost listeners, and labels likely web services using process names, command lines, common development ports, and common web framework commands.
+LocalWebManager calls `psutil` to enumerate local listening TCP sockets, filters out privileged and non-local addresses, then scores each process against a list of framework signatures (command line keywords, process names, common ports). Matching services get a framework label and emoji badge.
 
-The detector is intentionally heuristic. It may miss unusual setups and may show non-web local services if they look like development servers.
-
-## Registered Services
-
-Registered services are stored in:
-
-```text
-~/.config/localwebmanager/registered_services.json
-```
-
-Launch logs are written to:
-
-```text
-~/.config/localwebmanager/logs/
-```
+Detection is heuristic. It may miss unusual setups or surface non-web local listeners that look like dev servers.
 
 ## Safety Model
 
-- LocalWebManager only scans local listening sockets.
-- The browser dashboard binds to `127.0.0.1`.
-- Registered launch commands are user-controlled shell commands.
-- The Kill action sends `SIGTERM` only after confirmation.
+- Only local listening sockets are scanned (`127.0.0.1`, `0.0.0.0`, `::1`).
+- The server binds to `127.0.0.1` only.
+- Kill sends `SIGTERM` with a browser confirmation prompt; it does not force-kill.
 - Some process command lines or working directories may be hidden by OS permissions.
-
-Do not register commands you would not run manually in a terminal.
 
 ## License
 

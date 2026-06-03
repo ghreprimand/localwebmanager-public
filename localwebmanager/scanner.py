@@ -23,6 +23,8 @@ class ServiceInfo:
     port: int
     status: str
     url: str
+    framework: str | None = None
+    friendly_name: str | None = None
 
 
 def _is_local_address(ip: str | None) -> bool:
@@ -67,7 +69,78 @@ def _is_likely_web_process(cmdline: str, proc_name: str) -> bool:
 def _app_name_from_cwd(cwd: str | None) -> str:
     if not cwd:
         return "unknown"
-    return Path(cwd).name or cwd
+    name = Path(cwd).name
+    if not name or name == "/":
+        return "unknown"
+    return name
+
+
+# Maps cmdline/process markers → (framework label, icon hint).
+_FRAMEWORK_SIGNATURES: list[tuple[str, str, str]] = [
+    ("vite", "Vite", "⚡"),
+    ("next", "Next.js", "▲"),
+    ("nuxt", "Nuxt", "💚"),
+    ("astro", "Astro", "🚀"),
+    ("svelte", "SvelteKit", "🔥"),
+    ("remix", "Remix", "💿"),
+    ("webpack", "Webpack", "📦"),
+    ("parcel", "Parcel", "📦"),
+    ("react-scripts", "Create React App", "⚛️"),
+    ("ng serve", "Angular CLI", "🅰️"),
+    ("flask", "Flask", "🐍"),
+    ("django", "Django", "🐍"),
+    ("uvicorn", "Uvicorn", "🦄"),
+    ("gunicorn", "Gunicorn", "🦄"),
+    ("fastapi", "FastAPI", "⚡"),
+    ("http.server", "Python HTTP", "🐍"),
+    ("rails server", "Rails", "💎"),
+    ("hugo", "Hugo", "📝"),
+    ("php -s", "PHP Built-in", "🐘"),
+    ("gatsby", "Gatsby", "💜"),
+    ("express", "Express", "🟢"),
+    ("fastify", "Fastify", "🟢"),
+    ("hono", "Hono", "🔥"),
+    ("elysia", "Elysia", "🦊"),
+    ("bun", "Bun", "🍞"),
+    ("deno", "Deno", "🦕"),
+    ("tsx", "TSX", "📘"),
+]
+
+
+def _detect_framework(cmdline: str, process_name: str) -> tuple[str | None, str | None]:
+    """Return (framework_name, icon) from the command line / process name."""
+    haystack = f"{process_name} {cmdline}".lower()
+    for marker, label, icon in _FRAMEWORK_SIGNATURES:
+        if marker in haystack:
+            return label, icon
+    return None, None
+
+
+def _make_friendly_name(
+    app_name: str,
+    framework: str | None,
+    port: int,
+    process_name: str,
+) -> str:
+    """Build a human-readable display name like 'My App · Vite'."""
+    parts: list[str] = []
+
+    # Use project folder name, title-cased if it looks like a slug.
+    if app_name and app_name != "unknown":
+        pretty = app_name.replace("-", " ").replace("_", " ").title()
+        parts.append(pretty)
+
+    # Append framework info.
+    if framework:
+        parts.append(framework)
+    elif process_name not in ("unknown", "node", "python3", "python", "ruby", ""):
+        # Use process name when no framework detected and it's informative.
+        parts.append(process_name)
+
+    if not parts:
+        return f"Service on port {port}"
+
+    return " · ".join(parts)
 
 
 def _is_likely_web_service(process_name: str, cmdline: str, port: int) -> bool:
@@ -159,17 +232,22 @@ def discover_local_web_services() -> list[ServiceInfo]:
 
         url = f"http://localhost:{port}/"
         key = (pid, host, port)
+        app_name = _app_name_from_cwd(cwd)
+        framework, _icon = _detect_framework(cmdline, process_name)
+        friendly_name = _make_friendly_name(app_name, framework, port, process_name)
         services[key] = ServiceInfo(
             pid=pid,
             process_name=process_name,
             cmdline=cmdline,
             cwd=cwd,
-            app_name=_app_name_from_cwd(cwd),
+            app_name=app_name,
             likely_web=_is_likely_web_service(process_name, cmdline, port),
             host=host,
             port=port,
             status="LISTEN",
             url=url,
+            framework=framework,
+            friendly_name=friendly_name,
         )
 
     return sorted(

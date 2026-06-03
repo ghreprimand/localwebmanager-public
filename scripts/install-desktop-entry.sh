@@ -15,12 +15,15 @@ cat > "$DESKTOP_FILE" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=LocalWebManager
-Comment=View active local web services
-Exec=bash -lc 'cd "$ROOT_DIR" && ./run-desktop.sh'
+GenericName=Local Service Dashboard
+Comment=View and manage active local web services
+Exec=$ROOT_DIR/scripts/localwebmanager start
 Icon=localwebmanager
 Terminal=false
-Categories=Development;Utility;
-StartupNotify=true
+Categories=Development;Utility;Network;
+StartupNotify=false
+SingleMainWindow=true
+Keywords=web;services;localhost;ports;dev;server;
 DESKTOP
 
 chmod +x "$DESKTOP_FILE"
