@@ -17,7 +17,7 @@ It scans your machine's listening TCP sockets, identifies dev servers by process
 
 ## Requirements
 
-Python 3.9+ and the packages in `requirements.txt` (fastapi, uvicorn, psutil, starlette).
+Python 3.9+ and the packages in `requirements.txt` (fastapi, uvicorn, psutil). `starlette` ships with fastapi.
 
 ```bash
 python3 -m venv .venv
